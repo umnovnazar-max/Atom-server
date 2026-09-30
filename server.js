@@ -2,14 +2,24 @@ const express = require('express');
 const cors = require('cors');
 
 const app = express();
+
+// Разрешаем абсолютно любые запросы (CORS)
 app.use(cors());
 app.use(express.json());
 
-// Ключ берется из переменных окружения сервера
 const GROQ_API_KEY = process.env.GROQ_API_KEY;
+
+// Добавим главную страницу, чтобы не было "Cannot GET /"
+app.get('/', (req, res) => {
+    res.send('Atom Server is running successfully!');
+});
 
 app.post('/api/chat', async (req, res) => {
     try {
+        if (!GROQ_API_KEY) {
+            return res.status(500).json({ error: 'Ошибка: Переменная GROQ_API_KEY не задана на Render!' });
+        }
+
         const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
             method: 'POST',
             headers: {
@@ -23,11 +33,17 @@ app.post('/api/chat', async (req, res) => {
         });
 
         const data = await response.json();
+
+        if (!response.ok) {
+            return res.status(response.status).json({ error: data.error?.message || 'Ошибка Groq API' });
+        }
+
         res.json(data);
     } catch (error) {
-        res.status(500).json({ error: 'Ошибка при вызове ИИ' });
+        console.error('Server error:', error);
+        res.status(500).json({ error: 'Внутренняя ошибка сервера: ' + error.message });
     }
 });
 
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+const PORT = process.env.PORT || 10000;
+app.listen(PORT, '0.0.0.0', () => console.log(`Server running on port ${PORT}`));
